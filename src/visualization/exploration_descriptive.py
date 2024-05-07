@@ -5,6 +5,19 @@ from scipy.stats import skew
 
 
 def descriptive_analytics(df):
+    '''
+    This function calculates all the descriptive statistics needed for analysing all datasets.
+    First it calulates the number of cases, activities and events as well as the amount of unique process instances.
+    Furthermore the min/avg/med/max amount of of events per trace are determined. 
+    The same is done for the amount of unique activities per trace.
+    Next sparsity, variation and repetetivness are calculated.
+    By calculating individual the trace lengths it is possible to determine their 99.99%,99%, 95%, 75%, 50%, 25% quantile.
+    The trace length is also used to determine the skewness of a dataset.
+    The amount of categorical and numerical values per dataset is also determined.
+    Finally the dataset is ordered by time to calculate the min/avg/med/max of time betweeen two activities and two events.
+
+    At the end all those results are printed.
+    '''
 
     # Calculate the unique number of Instances, Activities and the amount of Events
     unique_instances = df["case:concept:name"].nunique()

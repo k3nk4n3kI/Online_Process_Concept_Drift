@@ -3,6 +3,20 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 
 def outliers(dataframe, case_column):         #case_column as string
+    '''
+    Function for identifying and deleting outliers. 
+    By calculating the Inter Quantil Range of the case length an upper and lower bound is defined.
+    Cases outside the upperbound are deleted. Cases outside the lower bound are deleted if they contain only one event.
+
+    Input:
+        -dataframe: dataframe - A dataframe whose outliers should be deleted
+        -case_column: str - Column name that contains the case IDs
+
+    Output:
+        -filtered_event_log: dataframe - Dataframe whose outliers are deleted
+
+    '''
+
     event_counts = dataframe[case_column].value_counts()
 
     #Calculate quantiles
@@ -23,6 +37,19 @@ def outliers(dataframe, case_column):         #case_column as string
 #-------------------------------------------------------------------------------
 
 def missing_values(dataframe, case_column):     #case_column as string
+    '''
+    Function that identifies all cases that contain at least one missing value and deletes the whole case accordingly.
+    Furthermore, spaces in the activity column are replaced with "-".
+
+    Input:
+        -dataframe: dataframe - Dataframe that should be checked for missing values
+        -case_column: str - Column name that contains the case IDs
+
+    Output:
+        -cleaned_df: dataframe - A dataframe whose case don't contain any missing values
+
+    '''
+    
     case_ids_with_missing_values = dataframe[dataframe.isnull().any(axis=1)][case_column].unique()
     cleaned_df = dataframe[~dataframe[case_column].isin(case_ids_with_missing_values)]
     # Replace whitespaces with hyphens in the "concept:name" column
@@ -33,6 +60,20 @@ def missing_values(dataframe, case_column):     #case_column as string
 #-------------------------------------------------------------------------------
 
 def normalize_and_lowercase(df):
+    '''
+    First all numerical columns of a dataframe are identified. By applying the MinMaxScaler all numerical colunms
+    are normalized to contain a value between 0 and 1. 
+    Next all columns are transformed into a string data data type for later prefix trace creation.
+    Finally all words are converted to be in lower case
+
+    Input:
+        -df: dataframe - Dataframe whose columns are normalized and transformed into string values
+
+    Output:
+        -new_df: dataframe - Dataframe that only contains lowercase and normalized string values
+
+    '''
+
     # Select numerical columns for normalization
     numerical_cols = df.select_dtypes(include=['int64', 'float64']).columns
     
@@ -56,6 +97,23 @@ def normalize_and_lowercase(df):
 #-------------------------------------------------------------------------------
 
 def generate_prefix_traces(df, sort_column, group_column, next_activity_column='next activity'):
+    '''
+    This function generates prefix traces from a dataframe containing event data. First it sorts the data by a timestamp column,
+    then groups the data by the case ID column. For each case, it iterates through the events in chronological order and creates
+    prefix traces by including all events up to the current event. Traces are created regarding the early fusion approach. Each 
+    prefix trace is stored along with the label of the next activity.
+
+    Input:
+        - df: dataframe - dataframe containing event data.
+        - sort_column: str - column name that contains the timestamps.
+        - group_column: str - column name that contains the case IDs.
+        - next_activity_column (optional): str - column name representing the next activity. Default is 'next activity'.
+
+    Output:
+        - prefix_traces: list - a list of tuples, where each tuple contains a prefix trace dataframe and its corresponding next activity label.
+
+    '''
+
     # Sort data by sort_column
     sorted_data = df.sort_values(by=sort_column)
 
@@ -82,6 +140,20 @@ def generate_prefix_traces(df, sort_column, group_column, next_activity_column='
 #-------------------------------------------------------------------------------
 
 def early_fusion(prefix_traces):
+    '''
+    This function creates a dataframe containing the sequenced prefix traces and the corresponding next activities.
+    It takes as input a list of tuples containing dataframes of prefix traces and their corresponding next activities. 
+    Next it iterates through each prefix trace, flattens it into a 1D sequence, and stores it along with the next activity
+    in separate lists. Then, it creates a dataframe containing these sequences and next activities. Finally, all entries
+    in the next activity column are converted to lowercase.
+
+    Input:
+        - prefix_traces: list - A list of tuples where each tuple contains a DataFrame representing a prefix trace and its corresponding next activity.
+
+    Output:
+        - df: dataframe - A dataframe that contains the sequenced prefix trace and its next activity.
+
+    '''
     sequences = []
     next_activities = []
 
