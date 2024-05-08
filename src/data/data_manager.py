@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import shutil
 import glob
 from datetime import datetime
 from pm4py.objects.conversion.log import converter as xes_converter
@@ -80,23 +81,26 @@ def data_loader(directory, folder, dataset, columns=None):
         df = pd.read_pickle(os.path.join(path, most_recent_file))
 
     elif folder == "/data/processed/":
-        # Construct the search pattern
-        pattern = os.path.join(folder, f"*_{dataset_name}_tensors")
+        # List all folders in the save directory
+        folders = [folder for folder in os.listdir(path) if os.path.isdir(os.path.join(path, folder))]
 
-        # Find all matching files
-        matching_files = glob.glob(pattern)
+        # Filter folders based on the dataset name
+        filtered_folders = [folder for folder in folders if dataset in folder]
 
-        if not matching_files:
-            raise FileNotFoundError(f"No matching dataset found for '{dataset_name}'")
+        # Sort the folders by date in descending order
+        sorted_folders = sorted(filtered_folders, reverse=True)
 
-        # Sort the matching files based on their names (which include the date)
-        matching_files.sort(reverse=True)
+        # Get the path of the most recent folder
+        if sorted_folders:
+            most_recent_folder = os.path.join(path, sorted_folders[0])
+            print(f"Loading dataset from folder: '{most_recent_folder}'")
 
-        # Get the most recent dataset file
-        most_recent_file = matching_files[0]
-
-        # Load the most recent dataset
-        df = tf.data.experimental.load(most_recent_file)
+            # Load the dataset from the most recent folder
+            loaded_dataset = tf.data.Dataset.load(most_recent_folder)
+            return loaded_dataset
+        else:
+            print("No dataset found.")
+            return None
 
     else:
         print("Path or file name are wrong")
@@ -139,94 +143,30 @@ def save_event_log(directory, folder, df, dataset_name):
         # Save DataFrame to pickle in the 'interim' folder
         df.to_pickle(file_path)
 
+        print(f"File saved as {file_name}")
+
+    elif folder == "/data/processed/":
+
+        file_name = f"{current_date}_ {dataset_name}_tensor"
+        file_path = os.path.join(path, file_name)
+
+        # If file already exists, replace it
+        if os.path.exists(file_path):
+            try:
+                shutil.rmtree(file_path)
+                print(f"Removed existing folder '{file_path}'")
+            except Exception as e:
+                print(f"Error removing folder '{file_path}': {e}")
+
+        # Save the dataset to the folder
+        tf.data.Dataset.save(df, file_path)
+        print(f"Saved new folder '{file_path}'")
+
+
+        print(f"File saved as {file_name}")
+
     else:
         print("Unsupported data type. Only Pandas DataFrame and TensorFlow dataset are supported.")
-
-
-#-------------------------------------------------------------------------------
-
-def save_tenors(inputs, labels, directory, folder, file_name):
-    '''
-    This function saves input tensors and their corresponding labels as a TFRecord dataset.
-
-    Input:
-        - inputs: tensor - Features of a dataset
-        - labels: tensor - Labels of a dataset
-        - directory: str - Directory dataset should be stored
-        - folder: str - Path to which folder should be stored
-        - file_name: str - Name of the dataset
-    
-    Output:
-        - saved dataset
-
-    '''
-    
-    path = directory +folder
-    current_date = datetime.now().strftime("%Y-%m-%d")
-    dataset_name = f'{current_date}_{file_name}_tensor'
-    file_path = os.path.join(path, dataset_name)
-
-    def serialize_data(inputs, labels):
-        feature= {
-            'inputs': tf.train.Feature(bytes_list=tf.train.BytesList(value=[inputs.numpy().tobytes()])),
-            'labels': tf.train.Feature(int64_list=tf.train.Int64List(value=[labels.numpy()]))
-        }
-        example_proto = tf.train.Example(features=tf.train.Features(feature=feature))
-
-        return example_proto.SerializeToString()
-    
-    def tf_serialize_examples(inputs, labels):
-        tf_string = tf.py_function(serialize_data, (inputs, labels), tf.string)
-
-        return tf.reshape(tf_string, ())
-    
-    tensor_dataset = tf.data.Dataset.from_tensor_slices((inputs, labels))
-    tfrec_dataset = tensor_dataset.map(tf_serialize_examples)
-
-    writer = tf.io.TFRecordWriter(file_path)
-    for serialized_data in tfrec_dataset:
-        writer.write(serialized_data.numpy())
-    
-#-------------------------------------------------------------------------------
-
-def load_tensors(directory, folder, file_name):
-    '''
-    This function loads input tensors and their corresponding labels from a TFRecord dataset.
-
-    Input:
-        - directory: str - Directory dataset should be stored
-        - folder: str - Path to which folder should be stored
-        - file_name: str - Name of the dataset
-    
-    Output:
-        - dataset: tf.data.Dataset - Most current tensor dataset
-        
-    '''
-
-    path = directory + folder
-    print(path)
-    file_pattern = os.path.join(path, f'*_{file_name}_tensor')
-    
-    # Use glob to find all matching files
-    matching_files = glob.glob(file_pattern)
-    sorted_files = sorted(matching_files)
-    most_recent = sorted_files[-1]
-
-    def parse_tfrecord_fn(example_proto):
-        feature_description = {
-            'inputs': tf.io.FixedLenFeature([], tf.string),
-            'labels': tf.io.FixedLenFeature([], tf.int64)
-        }
-        parsed_example = tf.io.parse_single_example(example_proto, feature_description)
-        inputs = tf.io.decode_raw(parsed_example['inputs'], tf.int32)
-        labels = parsed_example['labels']
-
-        return inputs, labels
-    
-    dataset = tf.data.TFRecordDataset(most_recent)
-    dataset = dataset.map(parse_tfrecord_fn)
-
-    return dataset
 
 #-------------------------------------------------------------------------------
 
