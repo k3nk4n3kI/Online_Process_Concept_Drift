@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np 
 from sklearn.preprocessing import MinMaxScaler
+from transformers import BertTokenizer
+import tensorflow as tf
 
 def outliers(dataframe, case_column):         #case_column as string
     '''
@@ -128,10 +130,11 @@ def generate_prefix_traces(df, sort_column, group_column, next_activity_column='
             
             # Create prefix trace
             prefix_trace = case_data.iloc[:prefix_length + 1].copy()  # Include current event
+            prefix_trace.drop(columns=[next_activity_column], inplace=True, errors='ignore')
             
             # Store prefix trace along with next activity label
             next_activity = None
-            if prefix_length < len(case_data) - 1:  # Check if there's a next activity
+            if prefix_length < len(case_data):  # Check if there's a next activity
                 next_activity = case_data.iloc[prefix_length][next_activity_column]
             prefix_traces.append((prefix_trace, next_activity))
 
@@ -179,3 +182,46 @@ def early_fusion(prefix_traces):
     return df
 
 #-------------------------------------------------------------------------------
+
+def encoding_and_tokenizing(dataframe, prefix_column, activity_column):
+    '''
+    This function takes a dataframe which consists of prefix traces and next activities as inputs and creates a new dataset of tensors.
+    First the prefix traces are tokenized by using the BertTokenizer. Next padding is applied to the tokenized sequences to ensure that
+    they are of equale length. The length is determined by the longest tokenized sequence.
+    To encode the next activities a dictionary is created which mapes the labels to a unique number. Next the dictionary is used to encode
+    the next activities. 
+    Finally the tokenized sequences and the encoded next activities are converted to tensors and merged to create the new tensor dataset.
+
+    Input:
+        - dataframe: dataframe - Dataframe that contains the prefix traces and the next activities
+        - prefix_column: str - Column name that contains the prefix traces
+        - activity_column: str - Colunm name that contains the next activities
+
+    Output:
+        - tensor-dataset: tf.data.Dataset - Dataset which contains the prefixes and next activities as tensors
+        
+    '''
+
+    #Tokenization of prefix traces
+    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+    tokenized_text = dataframe[prefix_column].apply(lambda x:tokenizer.encode(x, add_special_tokens=True))
+    #Calculating max sequence length for padding
+    max_length = max(len(seq) for seq in tokenized_text)
+    #Pad tokenized prefix traces
+    padded_sequences = tf.keras.preprocessing.sequence.pad_sequences(tokenized_text, padding='post', maxlen=max_length)
+
+
+    #Encode next activities
+    unique_labels = dataframe[activity_column].unique()
+    #Create label map using dictionary comprehension
+    label_map = {label: index for index, label in enumerate(unique_labels)}
+    encoded_labels = dataframe[activity_column].map(label_map)
+
+
+    #Create tensor dataset for input to BERT model
+    labels = tf.constant(encoded_labels)
+    inputs = tf.constant(padded_sequences)
+
+    tensor_dataset = tf.data.Dataset.from_tensor_slices((inputs, labels))
+
+    return tensor_dataset
