@@ -199,7 +199,7 @@ def encoding_and_tokenizing(dataframe, prefix_column, activity_column):
 
     Output:
         - tensor-dataset: tf.data.Dataset - Dataset which contains the prefixes and next activities as tensors
-        
+
     '''
 
     #Tokenization of prefix traces
@@ -224,4 +224,4 @@ def encoding_and_tokenizing(dataframe, prefix_column, activity_column):
 
     tensor_dataset = tf.data.Dataset.from_tensor_slices((inputs, labels))
 
-    return tensor_dataset
+    return  tensor_dataset, inputs, labels
