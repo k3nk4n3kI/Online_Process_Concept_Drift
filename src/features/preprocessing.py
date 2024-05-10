@@ -92,7 +92,7 @@ def normalize_and_lowercase(df):
     df = df.astype(str)
     
     # Convert all words to lowercase
-    new_df = df.applymap(lambda x: x.lower() if isinstance(x, str) else x)
+    new_df = df.map(lambda x: x.lower() if isinstance(x, str) else x)
 
     return new_df
 
@@ -218,10 +218,72 @@ def encoding_and_tokenizing(dataframe, prefix_column, activity_column):
     encoded_labels = dataframe[activity_column].map(label_map)
 
 
-    #Create tensor dataset for input to BERT model
-    labels = tf.constant(encoded_labels)
-    inputs = tf.constant(padded_sequences)
+    # Convert tokenized sequences and encoded labels to arrays
+    labels = tf.constant(encoded_labels, dtype=tf.int32)
+    inputs = tf.constant(padded_sequences, dtype=tf.int32)
 
     tensor_dataset = tf.data.Dataset.from_tensor_slices((inputs, labels))
 
-    return  tensor_dataset, inputs, labels
+    return  tensor_dataset
+
+#-------------------------------------------------------------------------------
+
+def split_data(df, train_ratio=0.7, val_ratio=0.15):
+    '''
+    Takes as input a pandas dataframe and splits it into train/val/test set.
+    During the split it is considered that no trace is seperated by a split. If this would be the case, 
+    the remaining events are included to the current set.
+
+    Input:
+        - df: dataframe - dataframe containing next acrivities
+        - train_ratio (optional): float - relative size of train set
+        - val_ratio (optinal): float - relative size of val set
+
+    Output:
+        - train_df: dataframe - containing the train data
+        - val_df: dataframe - containing the val data
+        - test_df: dataframe - containing the test data
+
+    '''
+
+    # Sort the dataframe by case ID and timestamp
+    df_sorted = df.sort_values(by=['case:concept:name', 'time:timestamp'])
+
+    # Get unique case IDs
+    unique_cases = df_sorted['case:concept:name'].unique()
+
+    # Calculate the number of cases for each split
+    total_cases = len(unique_cases)
+    train_cases = int(train_ratio * total_cases)
+    val_cases = int(val_ratio * total_cases)
+    test_cases = total_cases - train_cases - val_cases
+
+    # Initialize lists to store train, validation, and test sets
+    train_set = []
+    val_set = []
+    test_set = []
+
+    # Iterate over unique case IDs
+    for case_id in unique_cases:
+        # Get all instances of the current case
+        case_instances = df_sorted[df_sorted['case:concept:name'] == case_id]
+
+        # Assign instances to train, validation, and test sets based on counts
+        if len(train_set) < train_cases:
+            train_set.append(case_instances)
+        elif len(val_set) < val_cases:
+            val_set.append(case_instances)
+        else:
+            test_set.append(case_instances)
+
+    # Concatenate the sets to obtain the final train, validation, and test splits
+    train_df = pd.concat(train_set)
+    val_df = pd.concat(val_set)
+    test_df = pd.concat(test_set)
+
+    print("Train set shape:", train_df.shape)
+    print("Validation set shape:", val_df.shape)
+    print("Test set shape:", test_df.shape)
+
+    return train_df, val_df, test_df
+
