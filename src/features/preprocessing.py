@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np 
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
 from transformers import BertTokenizer
 import tensorflow as tf
 
@@ -33,6 +34,14 @@ def outliers(dataframe, case_column):         #case_column as string
 
     #Filter cases
     filtered_event_log = dataframe[dataframe[case_column].isin(event_counts[(event_counts <= upper_bound) & (event_counts >1)].index)]
+
+    #After df has been filtered it is filtered again for its 99% quantile
+    #This ensures that the final token length never exceeds 512
+    event_counts_filtered = filtered_event_log[case_column].value_counts()
+    Q99 = event_counts_filtered.quantile(0.99)
+
+    # Filter cases based on the 99% quantile
+    filtered_event_log = filtered_event_log[filtered_event_log[case_column].isin(event_counts_filtered[event_counts_filtered <= Q99].index)]
 
     return filtered_event_log
 
@@ -98,7 +107,39 @@ def normalize_and_lowercase(df):
 
 #-------------------------------------------------------------------------------
 
-def generate_prefix_traces(df, sort_column, group_column, next_activity_column='next activity'):
+def create_multiindex(df, case_column="case:concept:name", time_column="time:timestamp", org_column="org:resource"):
+    '''
+    This function takes as input a df and adds a multiindex based on the caseID and time to it.
+    In a next step all columns besides of the activitiy and next_activity columns are deleted. This ensures that during the tokenization of
+    the prefix traces all sequenzes stay below a token length of 512.
+    At the end the df is sorted by time and case ID.
+
+    Input:
+        - df: dataframe - The dataframe that whose multiindex should be created
+        - case_column (optional): str - Column name that contains the case IDs
+        - time_comlumn (optional): str - Column name that contains the timestamps
+        - org_column (optional): str - Column name that contains the org resource
+
+    Output:
+        - df: dataframe - Dataframe with new multiindex
+        
+    '''
+
+    #Create Multiindex based on caseID and time column
+    df.index = pd.MultiIndex.from_arrays(df[[case_column, time_column]].values.T, names=['caseID', 'time'])
+
+    #Drop all columns besides of activity and next activity
+    df.drop([case_column, time_column, org_column], axis=1, inplace=True)
+
+    #Sort df by caseID and time
+    df.sort_index(level=["caseID", "time"])
+
+    return df
+
+
+#-------------------------------------------------------------------------------
+
+def generate_prefix_traces(df, next_activity_column='next activity'):
     '''
     This function generates prefix traces from a dataframe containing event data. First it sorts the data by a timestamp column,
     then groups the data by the case ID column. For each case, it iterates through the events in chronological order and creates
@@ -107,8 +148,6 @@ def generate_prefix_traces(df, sort_column, group_column, next_activity_column='
 
     Input:
         - df: dataframe - dataframe containing event data.
-        - sort_column: str - column name that contains the timestamps.
-        - group_column: str - column name that contains the case IDs.
         - next_activity_column (optional): str - column name representing the next activity. Default is 'next activity'.
 
     Output:
@@ -116,13 +155,10 @@ def generate_prefix_traces(df, sort_column, group_column, next_activity_column='
 
     '''
 
-    # Sort data by sort_column
-    sorted_data = df.sort_values(by=sort_column)
-
     prefix_traces = []
 
-    # Group data by group_column
-    for case_id, case_data in sorted_data.groupby(group_column):
+    # Group data by case ID (first level of MultiIndex)
+    for case_id, case_data in df.groupby(level=0):
         # Iterate through events in chronological order
         for i in range(len(case_data)):
             # Define prefix length (e.g., all events up to the current event)
@@ -208,7 +244,7 @@ def encoding_and_tokenizing(dataframe, prefix_column, activity_column):
     #Calculating max sequence length for padding
     max_length = max(len(seq) for seq in tokenized_text)
     #Pad tokenized prefix traces
-    padded_sequences = tf.keras.preprocessing.sequence.pad_sequences(tokenized_text, padding='post', maxlen=max_length)
+    padded_sequences = tf.keras.preprocessing.sequence.pad_sequences(tokenized_text, padding='post', maxlen=512)
 
 
     #Encode next activities
@@ -249,37 +285,24 @@ def split_data(df, train_ratio=0.7, val_ratio=0.15):
     # Sort the dataframe by case ID and timestamp
     df_sorted = df.sort_values(by=['case:concept:name', 'time:timestamp'])
 
-    # Get unique case IDs
-    unique_cases = df_sorted['case:concept:name'].unique()
-
     # Calculate the number of cases for each split
-    total_cases = len(unique_cases)
+    total_cases = df_sorted['case:concept:name'].nunique()
     train_cases = int(train_ratio * total_cases)
     val_cases = int(val_ratio * total_cases)
     test_cases = total_cases - train_cases - val_cases
 
-    # Initialize lists to store train, validation, and test sets
-    train_set = []
-    val_set = []
-    test_set = []
+    # Get unique case IDs
+    unique_cases = df_sorted['case:concept:name'].unique()
 
-    # Iterate over unique case IDs
-    for case_id in unique_cases:
-        # Get all instances of the current case
-        case_instances = df_sorted[df_sorted['case:concept:name'] == case_id]
+    # Split the case IDs into train, validation, and test sets
+    train_case_ids, remaining_case_ids = train_test_split(unique_cases, train_size=train_ratio, shuffle=False)
+    val_case_ids, test_case_ids = train_test_split(remaining_case_ids, test_size=val_ratio / (1 - train_ratio), shuffle=False)
 
-        # Assign instances to train, validation, and test sets based on counts
-        if len(train_set) < train_cases:
-            train_set.append(case_instances)
-        elif len(val_set) < val_cases:
-            val_set.append(case_instances)
-        else:
-            test_set.append(case_instances)
-
-    # Concatenate the sets to obtain the final train, validation, and test splits
-    train_df = pd.concat(train_set)
-    val_df = pd.concat(val_set)
-    test_df = pd.concat(test_set)
+    # Select rows corresponding to train, validation, and test cases
+    train_df = df_sorted[df_sorted['case:concept:name'].isin(train_case_ids)]
+    remaining_df = df_sorted[~df_sorted['case:concept:name'].isin(train_case_ids)]
+    val_df = remaining_df[remaining_df['case:concept:name'].isin(val_case_ids)]
+    test_df = remaining_df[~remaining_df['case:concept:name'].isin(val_case_ids)]
 
     print("Train set shape:", train_df.shape)
     print("Validation set shape:", val_df.shape)

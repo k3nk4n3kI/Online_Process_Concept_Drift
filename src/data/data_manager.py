@@ -8,7 +8,7 @@ from pm4py.objects.log.importer.xes import importer as xes_importer
 import tensorflow as tf
 
 #Function to load an CSV or XES file into the model
-def data_loader(directory, folder, dataset, columns=None):
+def data_loader(directory, folder, dataset, columns=None, split=None):
     '''
     Function which loads .csv and .xes files into the working enviroment. Based on the input different states of a dataset
     can be loaded e.g. raw, interim or processed.
@@ -56,8 +56,11 @@ def data_loader(directory, folder, dataset, columns=None):
         # Sort by case:concept:name and time:timestamp
         if column_name in new_column_names.values():
             df = df.sort_values(by=['case:concept:name', column_name])
+        
         else:
             print('Data is not sorted by case and timestamp, because the column names don\'t correspont to the standard naming scheme.')
+
+        df['time:timestamp'] = df['time:timestamp'].dt.strftime("%Y-%m-%d %H:%M:%S")
 
     elif folder == "/data/interim/":
             # Get a list of all files in the directory
@@ -111,7 +114,7 @@ def data_loader(directory, folder, dataset, columns=None):
 #-------------------------------------------------------------------------------
 
 #Function to save dataset
-def save_event_log(directory, folder, df, dataset_name):
+def save_event_log(directory, folder, df, dataset_name, split=None):
     '''
     Function which saves datasets with uniform naming convention into the specific folder.
     Naming convention: current date + dataset name + "next_activity.pkl"
@@ -121,6 +124,7 @@ def save_event_log(directory, folder, df, dataset_name):
         - folder: str - path to the folder file should be stored
         - df: dataframe - Processed dataset, that should saved
         - dataset_name: str - Name of the specific dataset, which is used for the specific naming convention
+        - split: str - Name of datasplit
 
     Output:
         - Saved .pkl file in the data/interim folder 
@@ -147,7 +151,7 @@ def save_event_log(directory, folder, df, dataset_name):
 
     elif folder == "/data/processed/":
 
-        file_name = f"{current_date}_ {dataset_name}_tensor"
+        file_name = f"{current_date}_ {dataset_name}_{split}_tensor"
         file_path = os.path.join(path, file_name)
 
         # If file already exists, replace it
