@@ -255,8 +255,8 @@ def encoding_and_tokenizing(dataframe, prefix_column, activity_column):
 
 
     # Convert tokenized sequences and encoded labels to arrays
-    labels = tf.constant(encoded_labels, dtype=tf.int32)
-    inputs = tf.constant(padded_sequences, dtype=tf.int32)
+    labels = tf.constant(encoded_labels, dtype=tf.int32, name='label')
+    inputs = tf.constant(padded_sequences, dtype=tf.int32, name='prefix_trace')
 
     tensor_dataset = tf.data.Dataset.from_tensor_slices((inputs, labels))
 
