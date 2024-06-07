@@ -1,4 +1,4 @@
-#!/Users/lars/Documents/test/venv/bin/python
+#!/Users/lars/Documents/test/venv/bin/python3.10
 # -*- coding: utf-8 -*-
 import re
 import sys

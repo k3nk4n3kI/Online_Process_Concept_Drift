@@ -1,4 +1,4 @@
-#!/Users/lars/Documents/Uni/Masterarbeit/Online_Process_Concept_Drift/venv/bin/python3.10
+#!/Users/lars/Documents/test/venv/bin/python
 # -*- coding: utf-8 -*-
 import re
 import sys

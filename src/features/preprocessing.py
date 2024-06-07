@@ -37,6 +37,7 @@ def outliers(dataframe, case_column):         #case_column as string
 
     #After df has been filtered it is filtered again for its 99% quantile
     #This ensures that the final token length never exceeds 512
+
     event_counts_filtered = filtered_event_log[case_column].value_counts()
     Q99 = event_counts_filtered.quantile(0.99)
 
