@@ -1,7 +1,7 @@
 import pickle
 import matplotlib.pyplot as plt
 import numpy as np
-from transformers import LongformerTokenizer, BertTokenizer
+from transformers import LongformerTokenizer, BertTokenizer, AutoTokenizer
 
 
 
@@ -42,6 +42,7 @@ def plot_comparison(data, dataset, metric):
     plt.grid(True)
     plt.show()
 
+#-------------------------------------------------------------------------------
 
 # Function to calculate and print averages over epochs
 def calculate_epoch_averages(data, metric):
@@ -71,6 +72,7 @@ def calculate_epoch_averages(data, metric):
     
     return avg_values
 
+#-------------------------------------------------------------------------------
 
 # Function to plot average comparisons over epochs
 def plot_average_over_epochs(avg_values, metric):
@@ -101,6 +103,7 @@ def plot_average_over_epochs(avg_values, metric):
     plt.grid(True)
     plt.show()
 
+#-------------------------------------------------------------------------------
 
 def tokenize_text(data, column):
     '''
@@ -121,6 +124,8 @@ def tokenize_text(data, column):
     tokenized_sequences = [tokenizer.encode(text, add_special_tokens=True) for text in data[column]]
     return tokenized_sequences
 
+#-------------------------------------------------------------------------------
+
 # Function to create frequency distribution
 def create_freq_distribution(sequence_lengths):
     '''
@@ -136,6 +141,8 @@ def create_freq_distribution(sequence_lengths):
 
     unique, counts = np.unique(sequence_lengths, return_counts=True)
     return dict(zip(unique, counts))
+
+#-------------------------------------------------------------------------------
 
 def plot_barchart_helpdesk(freq1, freq2, label1, label2, title):
     '''
@@ -181,6 +188,8 @@ def plot_barchart_helpdesk(freq1, freq2, label1, label2, title):
 
     plt.show()
 
+#-------------------------------------------------------------------------------
+
 def plot_barchart_helpdesk_zoom(freq1, freq2, label1, label2, title, start=26, end=36):
     '''
     Creates a barchart which zooms in on a given range of frequencies to analyse their distribution in detail.
@@ -221,6 +230,8 @@ def plot_barchart_helpdesk_zoom(freq1, freq2, label1, label2, title, start=26, e
 
     plt.show()
 
+#-------------------------------------------------------------------------------
+
 # Function to create binned frequency distribution
 def create_binned_freq_distribution(sequence_lengths, bin_size=10):
     '''
@@ -240,6 +251,8 @@ def create_binned_freq_distribution(sequence_lengths, bin_size=10):
     binned_counts = np.histogram(sequence_lengths, bins=bins)[0]
     bin_labels = [(bins[i], bins[i+1]-1) for i in range(len(bins)-1)]
     return dict(zip(bin_labels, binned_counts))
+
+#-------------------------------------------------------------------------------
 
 def plot_barchart_bpic2012(freq1, freq2, label1, label2, title, min_length=0):
     '''
@@ -282,6 +295,8 @@ def plot_barchart_bpic2012(freq1, freq2, label1, label2, title, min_length=0):
 
     plt.show()
 
+#-------------------------------------------------------------------------------
+
 def plot_barchart_bpic2018(freq1, freq2, label1, label2, title):
     '''
     Creates a barchart which compares the amount of each sequence length for the normal event log with the shortend one.
@@ -319,6 +334,8 @@ def plot_barchart_bpic2018(freq1, freq2, label1, label2, title):
     fig.tight_layout()
 
     plt.show()
+
+#-------------------------------------------------------------------------------
 
 def plot_barchart_bpic2018_zoom(freq1, freq2, label1, label2, title, min_length=0):
     '''
@@ -361,6 +378,8 @@ def plot_barchart_bpic2018_zoom(freq1, freq2, label1, label2, title, min_length=
 
     plt.show()
 
+#-------------------------------------------------------------------------------
+
 def tokenize_text_base(data, column):
     '''
     Function that tokenizes the prefix traces of an event log in a way suitable for BERT base.
@@ -378,3 +397,287 @@ def tokenize_text_base(data, column):
     # Apply BERT tokenizer to the specified column without padding and truncation
     tokenized_sequences = [tokenizer.encode(text, add_special_tokens=True) for text in data[column]]
     return tokenized_sequences
+
+#---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+def plot_loss_accuracy_comparison(results_dict, datasets, num_epochs):
+    '''
+    Plots comparison of training and validation loss and accuracy for BERT and Longformer models over multiple datasets.
+
+    This function generates line plots to compare the performance (loss and accuracy) of static and dynamic versions
+    of BERT and Longformer models on the specified datasets.
+
+    Input:
+        - results_dict: dict - A dictionary containing the training history.
+        - datasets: list - A list of dataset names the model was trained on.
+    '''
+
+    # Dynamicall determines number of epochs
+    epochs = list(range(1, num_epochs + 1))
+    
+    for dataset in datasets:
+        static_bert_key = f'static_bert_{dataset}'
+        dynamic_bert_key = f'dynamic_bert_{dataset}'
+        static_long_key = f'static_longformer_{dataset}'
+        dynamic_long_key = f'dynamic_longformer_{dataset}'
+        
+        # Plot BERT models
+        if static_bert_key in results_dict and dynamic_bert_key in results_dict:
+            fig, axs = plt.subplots(1, 2, figsize=(15, 5))
+            
+            static_bert_loss = results_dict[static_bert_key]['loss']
+            dynamic_bert_loss = results_dict[dynamic_bert_key]['loss']
+            static_bert_val_loss = results_dict[static_bert_key]['val_loss']
+            dynamic_bert_val_loss = results_dict[dynamic_bert_key]['val_loss']
+            
+            static_bert_accuracy = results_dict[static_bert_key]['accuracy']
+            dynamic_bert_accuracy = results_dict[dynamic_bert_key]['accuracy']
+            static_bert_val_accuracy = results_dict[static_bert_key]['val_accuracy']
+            dynamic_bert_val_accuracy = results_dict[dynamic_bert_key]['val_accuracy']
+            
+            # Loss plot
+            axs[0].plot(epochs, static_bert_loss, label='Static BERT Train Loss', linestyle='-', color="blue")
+            axs[0].plot(epochs, dynamic_bert_loss, label='Dynamic BERT Train Loss', linestyle='-', color="orange")
+            axs[0].plot(epochs, static_bert_val_loss, label='Static BERT Val Loss', linestyle='--', color="blue")
+            axs[0].plot(epochs, dynamic_bert_val_loss, label='Dynamic BERT Val Loss', linestyle='--', color="orange")
+            axs[0].set_title(f'Training and validation loss - {dataset.upper()}')
+            axs[0].set_xlabel('Epochs')
+            axs[0].set_ylabel('Loss')
+            axs[0].set_xticks(epochs)
+            axs[0].legend()
+            axs[0].grid(True)
+            
+            # Accuracy plot
+            axs[1].plot(epochs, static_bert_accuracy, label='Static BERT Train Accuracy', linestyle='-', color="blue")
+            axs[1].plot(epochs, dynamic_bert_accuracy, label='Dynamic BERT Train Accuracy', linestyle='-', color="orange")
+            axs[1].plot(epochs, static_bert_val_accuracy, label='Static BERT Val Accuracy', linestyle='--', color="blue")
+            axs[1].plot(epochs, dynamic_bert_val_accuracy, label='Dynamic BERT Val Accuracy', linestyle='--', color="orange")
+            axs[1].set_title(f'Training and validation accuracy - {dataset.upper()}')
+            axs[1].set_xlabel('Epochs')
+            axs[1].set_ylabel('Accuracy')
+            axs[1].set_xticks(epochs)
+            axs[1].legend()
+            axs[1].grid(True)
+            
+            plt.tight_layout()
+            plt.show()
+        
+        # Plot Longformer models if they exist for the dataset
+        if static_long_key in results_dict and dynamic_long_key in results_dict:
+            fig, axs = plt.subplots(1, 2, figsize=(15, 5))
+            
+            static_long_loss = results_dict[static_long_key]['loss']
+            dynamic_long_loss = results_dict[dynamic_long_key]['loss']
+            static_long_val_loss = results_dict[static_long_key]['val_loss']
+            dynamic_long_val_loss = results_dict[dynamic_long_key]['val_loss']
+            
+            static_long_accuracy = results_dict[static_long_key]['accuracy']
+            dynamic_long_accuracy = results_dict[dynamic_long_key]['accuracy']
+            static_long_val_accuracy = results_dict[static_long_key]['val_accuracy']
+            dynamic_long_val_accuracy = results_dict[dynamic_long_key]['val_accuracy']
+            
+            # Loss plot
+            axs[0].plot(epochs, static_long_loss, label='Static Longformer Train Loss', linestyle='-', color="blue")
+            axs[0].plot(epochs, dynamic_long_loss, label='Dynamic Longformer Train Loss', linestyle='-', color="orange")
+            axs[0].plot(epochs, static_long_val_loss, label='Static Longformer Val Loss', linestyle='--', color="blue")
+            axs[0].plot(epochs, dynamic_long_val_loss, label='Dynamic Longformer Val Loss', linestyle='--', color="orange")
+            axs[0].set_title(f'Training and validation loss - {dataset.upper()}')
+            axs[0].set_xlabel('Epochs')
+            axs[0].set_ylabel('Loss')
+            axs[0].set_xticks(epochs)
+            axs[0].legend()
+            axs[0].grid(True)
+            
+            # Accuracy plot
+            axs[1].plot(epochs, static_long_accuracy, label='Static Longformer Train Accuracy', linestyle='-', color="blue")
+            axs[1].plot(epochs, dynamic_long_accuracy, label='Dynamic Longformer Train Accuracy', linestyle='-', color="orange")
+            axs[1].plot(epochs, static_long_val_accuracy, label='Static Longformer Val Accuracy', linestyle='--', color="blue")
+            axs[1].plot(epochs, dynamic_long_val_accuracy, label='Dynamic Longformer Val Accuracy', linestyle='--', color="orange")
+            axs[1].set_title(f'Training and validation accuracy - {dataset.upper()}')
+            axs[1].set_xlabel('Epochs')
+            axs[1].set_ylabel('Accuracy')
+            axs[1].set_xticks(epochs)
+            axs[1].legend()
+            axs[1].grid(True)
+            
+            plt.tight_layout()
+            plt.show()
+
+#-------------------------------------------------------------------------------
+
+def calculate_average_metrics(results_dict, model_type, datasets):
+    '''
+    Calculates average metrics (loss and accuracy) across multiple datasets for each epoch.
+
+    Input:
+        - results_dict: dict - A dictionary containing the training history
+        - model_type: str - The type of model to calculate the metrics for.
+        - datasets: list - A list of dataset names to calculate the average metrics for.
+
+    Output:
+        - tuple: A tuple containing lists of average static and dynamic train/validation losses and accuracies.
+    '''
+
+    # Initialize lists to hold average metrics for each epoch
+    avg_static_loss = []
+    avg_static_val_loss = []
+    avg_dynamic_loss = []
+    avg_dynamic_val_loss = []
+    avg_static_accuracy = []
+    avg_static_val_accuracy = []
+    avg_dynamic_accuracy = []
+    avg_dynamic_val_accuracy = []
+    
+    # Get the number of epochs
+    num_epochs = len(results_dict[f'static_{model_type}_{datasets[0]}']['loss'])  
+    
+    for epoch in range(num_epochs):
+        total_static_loss = 0
+        total_static_val_loss = 0
+        total_dynamic_loss = 0
+        total_dynamic_val_loss = 0
+        total_static_accuracy = 0
+        total_static_val_accuracy = 0
+        total_dynamic_accuracy = 0
+        total_dynamic_val_accuracy = 0
+        count = 0 
+        
+        for dataset in datasets:
+            static_key = f'static_{model_type}_{dataset}'
+            dynamic_key = f'dynamic_{model_type}_{dataset}'
+            
+            if static_key in results_dict and dynamic_key in results_dict:
+
+                # Sum metrics for static and dynamic models across datasets for the current epoch
+                total_static_loss += results_dict[static_key]['loss'][epoch]
+                total_static_val_loss += results_dict[static_key]['val_loss'][epoch]
+                total_dynamic_loss += results_dict[dynamic_key]['loss'][epoch]
+                total_dynamic_val_loss += results_dict[dynamic_key]['val_loss'][epoch]
+                
+                total_static_accuracy += results_dict[static_key]['accuracy'][epoch]
+                total_static_val_accuracy += results_dict[static_key]['val_accuracy'][epoch]
+                total_dynamic_accuracy += results_dict[dynamic_key]['accuracy'][epoch]
+                total_dynamic_val_accuracy += results_dict[dynamic_key]['val_accuracy'][epoch]
+                
+                count += 1
+        
+        # Calculate average metrics for the current epoch
+        avg_static_loss.append(total_static_loss / count)
+        avg_static_val_loss.append(total_static_val_loss / count)
+        avg_dynamic_loss.append(total_dynamic_loss / count)
+        avg_dynamic_val_loss.append(total_dynamic_val_loss / count)
+        
+        avg_static_accuracy.append(total_static_accuracy / count)
+        avg_static_val_accuracy.append(total_static_val_accuracy / count)
+        avg_dynamic_accuracy.append(total_dynamic_accuracy / count)
+        avg_dynamic_val_accuracy.append(total_dynamic_val_accuracy / count)
+    
+    return (avg_static_loss, avg_static_val_loss, avg_dynamic_loss, avg_dynamic_val_loss,
+            avg_static_accuracy, avg_static_val_accuracy, avg_dynamic_accuracy, avg_dynamic_val_accuracy)
+
+#-------------------------------------------------------------------------------
+
+def plot_average_metrics(results_dict, datasets, model_type):
+    '''
+    Plots average metrics (loss and accuracy) across multiple datasets for each epoch.
+
+    Input:
+        - results_dict: dict - A dictionary containing the training history
+        - datasets: list - A list of dataset names to calculate the average metrics for.
+        - model_type: str - The type of model to plot the metrics for.
+    '''
+
+    # Calculate average metrics using the helper function
+    (avg_static_loss, avg_static_val_loss, avg_dynamic_loss, avg_dynamic_val_loss,
+     avg_static_accuracy, avg_static_val_accuracy, avg_dynamic_accuracy, avg_dynamic_val_accuracy) = calculate_average_metrics(results_dict, model_type, datasets)
+    
+    # Create a list of epochs
+    epochs = list(range(1, len(avg_static_loss) + 1))  
+    
+    # Create a figure with two subplots
+    fig, axs = plt.subplots(1, 2, figsize=(15, 6))  
+    
+    # Plot average loss
+    axs[0].plot(epochs, avg_static_loss, label=f'{model_type.capitalize()} Static Train Loss', linestyle='-', color='black')
+    axs[0].plot(epochs, avg_static_val_loss, label=f'{model_type.capitalize()} Static Val Loss', linestyle='--', color='black')
+    axs[0].plot(epochs, avg_dynamic_loss, label=f'{model_type.capitalize()} Dynamic Train Loss', linestyle='-', color='red')
+    axs[0].plot(epochs, avg_dynamic_val_loss, label=f'{model_type.capitalize()} Dynamic Val Loss', linestyle='--', color='red')
+    axs[0].set_title(f'Average Loss - {model_type.capitalize()} Models Across All Datasets')
+    axs[0].set_xlabel('Epochs')
+    axs[0].set_ylabel('Loss')
+    axs[0].set_xticks(epochs)
+    axs[0].legend()
+    axs[0].grid(True)
+    
+    # Plot average accuracy
+    axs[1].plot(epochs, avg_static_accuracy, label=f'{model_type.capitalize()} Static Train Accuracy', linestyle='-', color='black')
+    axs[1].plot(epochs, avg_static_val_accuracy, label=f'{model_type.capitalize()} Static Val Accuracy', linestyle='--', color='black')
+    axs[1].plot(epochs, avg_dynamic_accuracy, label=f'{model_type.capitalize()} Dynamic Train Accuracy', linestyle='-', color='red')
+    axs[1].plot(epochs, avg_dynamic_val_accuracy, label=f'{model_type.capitalize()} Dynamic Val Accuracy', linestyle='--', color='red')
+    axs[1].set_title(f'Average Accuracy - {model_type.capitalize()} Models Across All Datasets')
+    axs[1].set_xlabel('Epochs')
+    axs[1].set_ylabel('Accuracy')
+    axs[1].set_xticks(epochs)
+    axs[1].legend()
+    axs[1].grid(True)
+    
+    plt.tight_layout()
+    plt.show()  
+
+#-------------------------------------------------------------------------------
+
+def tokenize_and_calculate_lengths(texts):
+    '''
+    Tokenizes the 'prefix_trace' column of a dataset and calculates the length of each tokenized trace.
+
+    This function uses a tokenizer to convert a column of prefix traces into tokenized sequences. 
+    It then calculates the length of each tokenized sequence.
+
+    Input:
+        - texts: df['column'] - A df column that contains the prefix traces that should be tokenized.
+
+    Output:
+        - lengths: list - A list containing the lengths of each tokenized prefix trace.
+    '''
+
+    tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+
+    # Tokenize the input texts without padding and truncation
+    tokenized_texts = tokenizer(texts, padding=False, truncation=True, return_tensors="np")
+
+    # Calculate the length of each tokenized text
+    lengths = [len(input_id) for input_id in tokenized_texts['input_ids']]
+
+    return lengths
+
+#-------------------------------------------------------------------------------
+
+def calculate_average_batch_lengths(lengths, batch_size):
+    '''
+    Calculates the average length of tokenized prefix traces in each batch.
+
+    This function divides a list of tokenized prefix trace lengths into batches and calculates the average length
+    of tokenized sequences in each batch.
+
+    Input:
+        lengths: list - A list of lengths of tokenized prefix traces.
+        batch_size: int - The number of samples per batch.
+
+    Ouput:
+        - avg_batch_lengths: list - A list containing the average length of tokenized sequences for each batch.
+    '''
+
+    # Calculate the number of batches
+    num_batches = len(lengths) // batch_size
+    
+    # Divide lengths into batches
+    batch_lengths = [lengths[i*batch_size:(i+1)*batch_size] for i in range(num_batches)]
+    
+    # Calculate the average length for each batch
+    avg_batch_lengths = [sum(batch)/len(batch) for batch in batch_lengths]
+    
+    return avg_batch_lengths
+
+#-------------------------------------------------------------------------------
+
+
