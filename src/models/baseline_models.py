@@ -564,8 +564,7 @@ class LongformerModelBuilderDynamic:
         dropout = tf.keras.layers.Dropout(rate=0.3)(pooled_output)
 
         # Final dense layer with softmax activation and L2 regularization
-        output = tf.keras.layers.Dense(self.num_classes, activation='softmax', dtype=tf.float32,
-                                       kernel_regularizer=tf.keras.regularizers.l2(0.01))(dropout)
+        output = tf.keras.layers.Dense(self.num_classes, activation='softmax', dtype=tf.float32)(dropout)
         
         # Create the model
         model = tf.keras.Model(inputs=[input_ids, attention_mask], outputs=output)
@@ -720,7 +719,7 @@ class BERTModelBuilderDynamic:
         pooled_output = tf.keras.layers.Lambda(lambda x: tf.cast(x.pooler_output, tf.float32))(encoder_outputs)
 
         # Apply dropout
-        dropout = tf.keras.layers.Dropout(rate=0.3)(pooled_output)
+        dropout = tf.keras.layers.Dropout(rate=0.1)(pooled_output)
 
         # Final dense layer for classification with softmax activation function and L2 regularization
         output = tf.keras.layers.Dense(self.num_classes, activation='softmax', dtype=tf.float32,

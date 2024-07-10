@@ -78,6 +78,9 @@ target/
 # exclude data from source control by default
 /data/
 /models/models_pretrained2
+/models/Weights_BPIC2012_Tuned
+/models/Weights_BPIC2018_Tuned
+/models/Weights_Helpdesk_Tuned
 
 # Mac OS-specific storage files
 .DS_Store
